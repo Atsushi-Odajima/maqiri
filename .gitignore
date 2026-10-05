@@ -15,3 +15,4 @@ playwright-report/
 Thumbs.db
 tests/perf/.result.json
 tests/.build/
+*.tsbuildinfo

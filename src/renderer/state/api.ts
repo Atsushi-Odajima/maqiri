@@ -20,6 +20,7 @@ export function parseIpcError(e: unknown): AppErrorShape {
 }
 
 export async function invoke<C extends IpcChannel>(channel: C, payload: IpcPayload<C>): Promise<IpcResult<C>> {
+  if (typeof window.maqiri === 'undefined') throw { code: 'E_IPC', message: 'この画面はブラウザ内の見本です。Windows アプリとして起動してください。' } satisfies AppErrorShape;
   try {
     return await window.maqiri.invoke(channel, payload);
   } catch (e) {
@@ -33,7 +34,7 @@ let unsubscribe: (() => void) | null = null;
 
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener);
-  if (!unsubscribe) {
+  if (!unsubscribe && typeof window.maqiri !== 'undefined') {
     unsubscribe = window.maqiri.onEvent((ev) => {
       for (const l of [...listeners]) l(ev);
     });

@@ -1,0 +1,78 @@
+Maqiri（マキリ）開発引き継ぎ（HANDOFF）
+=======================================
+記録日: 2026-10-05（作業環境: Linux コンテナ、Node 22.22.0、npm 10.9.4、システム ffmpeg 6.1.1、Electron 44.5.1 を xvfb 上で実起動）
+仕様正本: docs/spec/01_claude_code_prompt.txt（仕様版 1.0 / 2026-10-06）と docs/spec/03_brand_and_ui_spec.txt
+
+最優先の引き継ぎ事項（Codex 等に渡すとき）
+1. main / renderer 分離: レンダラーに Node・任意ファイル読み込み・絶対パスを渡さない。assetId / jobId / token で main が実体を解決する（src/main/assets.ts, protocol.ts, ipc.ts）。
+2. frame 正本: 保存・判定・書き出しは 30fps の整数フレーム半開区間 [startFrame, endFrame)。秒の小数表示を正本へ逆変換しない（src/domain/time.ts）。
+3. 共有 T0: 最初に表示される映像フレームの PTS を T0 とし、映像・音声を同じ T0 へ正規化する。音声に STARTPTS を使わない（src/media/filters.ts, analysisWorker.ts）。解析と書き出しは同じ正規化関数を使う。
+4. 元素材不変: 元ファイルへ書き込まない。出力は同 volume の一時ファイル → ffprobe 検証 → atomic rename。失敗時は一時ファイルを消し、完成名を作らない（src/main/controller.ts startExport）。
+5. privacy: 外部送信なし、ログはパス/ユーザー名をマスク、音声・フレームはログに含めない（src/main/log.ts, src/media/process.ts maskPaths）。
+
+現在版
+- package.json version 1.0.0（未リリース）。APP_EDITION=demo/full を electron-vite の define（__APP_EDITION__）で埋め込み、main 側で先頭 90 秒(2700 frames)を強制（src/main/edition.ts、controller.validateCutsForSource / limitFramesFor）。
+- 切断 algorithmVersion: 'rms20-v1'（20ms 窓 RMS、チャンネル別最大、閾値未満で quiet、等しい場合は保持）。
+
+変更一覧（主要ファイル）
+- 設定: package.json, electron.vite.config.ts, tsconfig.*.json, vitest.config.ts, vitest.media.config.ts, vitest.perf.config.ts, electron-builder.yml, media-tools.lock.json
+- scripts/: prepare-media-tools.mjs（固定 URL/SHA256 取得・検証・対応ソース生成）, generate-fixtures.mjs（lavfi fixture 30 本）, generate-sample.mjs（同梱 10 秒サンプル）, dist.mjs（demo/full ビルド + SHA256SUMS）, check-contrast.mjs（WCAG コントラスト自動検査）
+- src/shared/: constants.ts, errors.ts, types.ts, schemas.ts（Zod: プロジェクト/IPC）, ipc.ts, channels.ts
+- src/domain/: time.ts, ranges.ts, rms.ts, settings.ts, candidates.ts, keeps.ts, history.ts, analysis.ts, outputSize.ts
+- src/media/: tools.ts, process.ts, probe.ts, analysisWorker.ts, analysis.ts, filters.ts, encoder.ts, export.ts, verify.ts, junction.ts, selftest.ts
+- src/main/: index.ts, controller.ts, ipc.ts, jobs.ts, assets.ts, protocol.ts, projects.ts, cache.ts, fsutil.ts, settings.ts, log.ts, edition.ts
+- src/preload/: index.ts（invoke/onEvent のみ公開）, api.d.ts
+- src/renderer/: App.tsx, main.tsx, state/(api.ts, store.ts), components/(common, Waveform, CandidateList, SettingsPanel, VideoPreview, JunctionPanel), screens/(Start, Load, Edit, ExportDialog, Done, Settings, RecoveryDialog), styles/(tokens, base, fonts, screens)
+- tests/: domain/*, unit/(filters, main), media/(probe, analysis, export + helpers/globalSetup), e2e/app.e2e.ts, perf/export.perf.ts, fixtures/algorithm_fixture.json
+- docs/: SETUP_WINDOWS, TEST_REPORT, RELEASE_CHECKLIST, HANDOFF, THIRD_PARTY_NOTICES, EULA_DRAFT, START_HERE_JA, FORMAT_LIMITS, CHANGELOG, spec/
+
+Windows 検証機
+- なし（本作業環境は Linux）。Windows 11 実機での実施が必要な項目は docs/TEST_REPORT.txt「未実施」節と RELEASE_CHECKLIST B〜F に列挙。
+
+実行コマンド
+  npm ci / npm run media:prepare / npm run typecheck / npm test / npm run test:media / npm run build / npm run test:e2e / npm run dev / npm run dist:demo / npm run dist:full
+  性能計測（明示実行）: npx vitest run --config vitest.perf.config.ts
+
+固定 FFmpeg 構成（media-tools.lock.json）
+- BtbN/FFmpeg-Builds autobuild-2026-10-05-13-07、ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-8.1.zip、SHA256 c7b6c644…308b、LGPL v3（--enable-version3、GPL/nonfree なし、libx264/x265 なし）
+- ffmpeg.exe / ffprobe.exe の SHA256 を manifest に固定し、起動時に照合（src/media/tools.ts verifyBundledTools）
+- h264_mf / hevc_mf / aac_mf の存在はバイナリ内の文字列で確認。Windows 実機での実行確認は未実施（lock の windowsRuntimeVerification = NOT_PERFORMED）
+- 対応ソース: FFmpeg コミット 330caae0c1 の git archive と BtbN スクリプト(9acad4a9)を resources/media-tools/source/ に生成し配布物へ同梱。依存ライブラリの全ソース集合は未収集（RELEASE_CHECKLIST E）
+
+エンコーダー設定（src/media/encoder.ts）
+- 配布版: h264_mf、-hw_encoding 0（CPU ソフトウェア）を既定。variants 順: pc_vbr+camera_record → pc_vbr → cbr → default。起動時 2 秒の自己診断で最初に成功した variant を採用し、export report に記録。全滅なら E_ENCODER を表示し別コーデックへ変えない
+- 開発ホスト: libx264 を dev encoder として使用（配布しない）
+
+テスト結果 / 未実施
+- 詳細は docs/TEST_REPORT.txt。Linux 上で typecheck / 単体 / 統合（実 ffmpeg）/ e2e（Electron 実起動）は実施済み。Windows 実機（h264_mf、インストーラー、オフライン 90 秒体験、性能計測）は未実施。
+
+残課題（AC 対応）
+- AC01 クリーン Windows 11 でインストーラーから起動しサンプルを MP4 出力: 未実施（Windows が無い。dist は NSIS 生成で wine が必要なため Linux では win-unpacked まで）
+- AC02 fixture 一致 [305,355): 達成（domain / media テスト）
+- AC03 元素材 SHA-256 不変・元パス出力禁止: 達成（media テスト、controller の同一実体チェック）
+- AC04 保持の再解析後維持 / Undo: 達成（domain テスト + e2e）
+- AC05 境界試聴と最終出力が同じカット判定、stale を表示しない: 達成（同一 filter builder、revision で stale 化。e2e で試聴生成を確認）
+- AC06 30 分 / 600 候補の書き出しと UI 応答性: 600 カットの filter script は統合テストで検証。30 分素材での実機書き出し・キャンセルの体感は未実施
+- AC07 A/V 同期・フレーム数許容: 達成（fixture 10 種で検証、音声遅延 +200ms / 先行 150ms / VFR / 29.97 / 59.94 / 負 PTS）
+- AC08 破損 / HDR / 無音声 / 全無音 / 対応外 codec の表示: 達成（probe テスト + UI の状態表示）
+- AC09 読込/書込/容量/中断エラーで元動画と完成済み出力を失わない: 設計で達成（tmp → verify → rename、キャンセルで tmp 削除）。read-only 保存先テストは root 実行のため未検証、Windows での実機確認が必要
+- AC10 DEMO 90 秒制限 / FULL 無制限、main で検査: 達成（edition.ts、validateCutsForSource、e2e は demo ビルドで実施）。FULL ビルドの e2e は未実施
+- AC11 外部通信なし / renderer に Node なし: 達成（CSP、sandbox、e2e で window.require/process 不在を確認）
+- AC12 ブランド / 画面仕様 / a11y / 配布物 / NOTICE / 対応ソース: 画面・コントラスト・レイアウト（960×700/1280×800/1440×900/200%）は e2e で確認。配布物の最終確認と依存ライブラリ全ソースは未完
+
+既知の制約・注意
+- 書体は assets/fonts から electron-vite の renderer publicDir として配信する(resources/fonts へは複製しない。仕様の「resources/fonts/：同梱assets/fonts」は assets/fonts → out/renderer/fonts の配信で満たす)。NotoSerifJP は 13.5MB あり、S0 の宣言見出しだけに使うためサブセット化が将来の最適化候補。
+- Linux の dist は NSIS 段階で wine が無く失敗する。Windows 上で npm run dist:* を実行すること（win-unpacked の構成は確認済み）。
+- 署名なし。SmartScreen 警告を回避できると約束しない。
+- HEVC 入力はブラウザ再生できないことがあるため 720p proxy を自動生成（preview:render kind=proxy）。proxy 生成中は元ファイルを直接再生しようとして失敗することがある（表示は注記のみ）。
+- 常時 BGM / 大きな環境音では無音を検出できない（constant_bgm fixture で確認済みの限界）。
+- 候補端点の調整は保持(keep)と延長(manualCut)の組み合わせで表現し、延長は再解析後に quiet run 外なら破棄して通知する。
+- 日本語自録 5 本による耳での品質確認は未実施（人工 fixture のみ）。『自然な日本語品質合格』とは言えない。
+- 性能の広告用数値は Windows 実機の計測のみ使うこと。Linux の参考値は TEST_REPORT に明記。
+
+次の一手
+1. Windows 11 実機で SETUP_WINDOWS の 3〜5 を実施し、h264_mf の variant を確定（TEST_REPORT と lock を更新）
+2. npm run dist:demo / dist:full を Windows で実行、クリーン機でオフライン 90 秒体験（RELEASE_CHECKLIST F）
+3. 自録 5 本で耳の確認、性能計測（10 分 1080p）
+4. 依存ライブラリ全ソースの収集方針を決め THIRD_PARTY_NOTICES / EULA を確定（法務確認）
+5. 署名証明書の手配（任意）、販売ページの文言は TEST_REPORT の実測だけを使う
