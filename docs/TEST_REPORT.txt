@@ -1,0 +1,94 @@
+Maqiri テスト報告（TEST_REPORT）
+================================
+記録日: 2026-10-05
+実施環境: Linux コンテナ（Ubuntu、kernel 6.18、Intel Xeon 2.10GHz 4 コア、RAM 16GiB）、Node v22.22.0、npm 10.9.4、
+         Electron 44.5.1（xvfb-run 上で実起動）、Playwright 1.63.0、Vitest 5.0.3、システム ffmpeg 6.1.1（開発専用 dev encoder = libx264）
+重要: Windows 11 実機での検証は未実施です。本報告の「合格」は Linux 上の自動テストの結果であり、配布判断には第 5 節「未実施」の完了が必要です。
+      実行していないテストを合格と報告していません。
+
+1. 静的検査
+- npm run typecheck（tsc strict、node/web 両プロジェクト）: 合格（エラー 0）
+- node scripts/check-contrast.mjs（WCAG 相対輝度）: 合格 14/14
+  本文 ink/paper 12.73:1、muted/paper 5.35:1、主ボタン文字/action 6.13:1、選択面 ink/selected 10.33:1、accent/paper 3.16:1（非テキスト ≥3）、
+  機能境界 #817365/paper 3.71:1、focus ring action/paper 5.19:1、warning/error/success 文字 ≥ 6.4:1
+
+2. 単体テスト（npm test、Vitest）: 合格 57/57（7 ファイル）
+A ドメイン（tests/domain）
+- 閾値ちょうど（等しい → 保持）/ ±0.1dB、20ms 窓境界、run=780/800ms（20ms 格子）、余白和 ≥ run → 候補なし、
+  [10,12) 自然に → [305,355) 50 フレーム（samples/algorithm_fixture.json と一致）、先頭/末尾の同規則とクリップ、
+  重複/接触の和集合、保護区間の差集合（3 フレーム未満の欠片を破棄）、Undo/Redo 100 上限、600 超 → tooMany（黙って捨てない）、全無音/全有音、
+  手動延長は quiet run 外で破棄・通知、残り 1 秒未満、プリセット 3 種と正規化、残す間の半分ずつ配分
+- 整数除算の厳密性、ms → frame の内側丸め、N = ceil(D·30)
+単体（tests/unit）
+- filter builder: between(n,a,b-1)/not 式、整数検証、T0 正規化、fps=30:start_time、tpad/trim=N、aresample first_pts、apad/atrim N·1600、
+  asetnsamples=1600、ウィンドウ付き（-ss 用）式、偶数寸法、拡大禁止、planExport の argv（shell なし）、h264_mf プランは常に -hw_encoding 0
+- probe 補助: tbToUs の BigInt 精度、display matrix の回転正規化（tags.rotate との二重適用なし）、色変換計画、ログのパス/ユーザー名マスク
+- main: Range 解析（上限 8MiB、416）、protocol の traversal/encoded traversal/未知 id/クエリ付き/UNC 拒否、偽 assetId、token 種別不一致、
+  プロジェクトの atomic 保存と .bak、悪意ある title をデータとして保持、未知 schemaVersion/他製品/壊れた JSON/非整数フレーム → E_PROJECT_SCHEMA、
+  回復候補（.tmp）→ 復元で現行を .bak、CSV の数式対策（= + - @ と引用符）、連番ファイル名、ジョブ管理（export が analysis を追い越す、
+  キャンセル → E_CANCELLED、replaceKey）、キャッシュ LRU（古い順・使用中除外）、DEMO 2700 フレーム境界
+
+3. 統合テスト（npm run test:media、実 ffmpeg/ffprobe を spawn）: 合格 49/49（3 ファイル、約 75 秒）
+fixture: scripts/generate-fixtures.mjs が lavfi で 30 本を自動生成（色面 + 白フレームマーカー、ノイズ発話 + 1kHz ビープ + 既知無音。権利問題なし）
+B 音声
+- 左だけ発話/右無音、左右逆相: チャンネル別 RMS の最大で quiet 誤判定なし（単純平均なら逆相は消える）
+- 極小声 -42dBFS: -35 で quiet、-45 で有声として残る
+- 一定 BGM -30dBFS: -35 では無音を検出できない（文書化した限界）、-25 なら検出
+- 咳（100ms, -15dBFS）: run が 2 つに分かれる
+- 全無音 → all-quiet、全有声 → no-candidates
+- 選択トラック違い: 無音の default トラックは all-quiet、声のトラックでは候補あり（UI で選択必須）
+- 解析の 0 点 = 映像の 0 点: 音声 +200ms 遅延で無音境界が 200ms 後ろへ、音声先行 150ms で 150ms 前へ（±40ms = 2 窓以内）
+- 短い音声: 末尾を無音でパディング、窓数 = ceil(N·1600/960)
+- DEMO limitFrames=300 で窓数 500、キャンセルで E_CANCELLED
+C 映像
+- 横 1080p30、縦 1080×1920（display matrix 回転 → 表示寸法のみ反映、出力に回転メタデータなし）、720p/25fps/mono、29.97、50、59.94、60fps、VFR（検出・警告）、
+  負 PTS/edit list（discard パケット除外、T0 = 最初の表示フレーム、N=345）、音声 +200ms / 音声先行 150ms、末尾短い音声、HEVC 8bit（警告付き受理）
+- 拒否: 音声なし E_NO_AUDIO、HDR(PQ) E_FORMAT、10bit E_FORMAT、インターレース E_FORMAT、4K E_TOO_BIG_FRAME、MKV E_FORMAT、VP9 E_FORMAT、破損 E_FORMAT、6ch 音声 E_FORMAT
+D 出力（dev encoder libx264、filter graph は配布版と同一）
+- 削除 0 / 1 / 600（filter script 20KB 超、フレーム数一致）、長さ E/30、フレーム数 = E（ffprobe パケット数）、音声長の差 ≤ 48ms、A/V 終端差 ≤ 50ms、
+  画角維持（1920×1080、720×1280、25fps→30fps）、mono 128kbps / stereo 192kbps
+- 同期マーカー（白フレーム + ビープ）: 1080p30、25fps、29.97、59.94、50、VFR、音声遅延 +200ms（音声マーカーが映像の 6 フレーム後 = 遅延維持）、
+  音声先行 150ms（4.5 フレーム前）で、各地点のズレ ≤ 1 フレーム
+- AC03: 元素材の SHA-256 が書き出し前後で同一
+- 長い日本語パス/絵文字/引用符/& を含む出力パス: argv で渡し成功
+- キャンセル: 'q' 送信 → 5 秒以内に終了、E_CANCELLED、一時ファイルのみ
+- read-only 保存先: root 実行のため本ホストでは検証不能（スキップ、Windows で実施）
+- つなぎ目試聴: 前後 2 秒（端でクリップ）、元版 170 フレーム / 編集版 120 フレーム、-ss + -copyts、先頭付近はシークなし、検証合格
+- エンコーダー自己診断: 2 秒テスト合格（dev-libx264）
+
+4. Electron 実起動 E2E（npm run build → npm run test:e2e、Playwright + xvfb、DEMO ビルド）: 合格 9/9（約 13 秒）
+- S0 表示（主操作・対応条件）、renderer に window.require / process が無い、公開 API は invoke/onEvent/platform のみ
+- 同梱サンプル → probe/hash → 解析 → S2（候補 3 件、波形）
+- この間を残す → 保持表示 → Undo → Redo → Undo
+- つなぎ目を確認 → 元/編集後の video が maqiri-media://cache/ で再生可能
+- 書き出し（E2E フックで保存先固定）→ S4 完了、sample_10s_maqiri.mp4 = 1280×720 30fps 230 フレーム（300 − 70）、一時ファイル残なし
+- 自動保存 → 最近の一覧に表示、projects/*.maqiri.json
+- 960×700 / 1280×800 / 1440×900 / 200% ズームで横スクロールなし、Tab で主操作へ到達しフォーカスリング可視
+- AC04: 最近の一覧から再オープン → 保持が残る → プリセット変更（再解析）後も保持が残る
+- スクリーンショット: tests/e2e/.artifacts/*.png（非コミット）
+
+5. 未実施（Windows 11 実機が必要。RELEASE_CHECKLIST B〜F）
+- 固定 FFmpeg ビルドの Windows 実行確認: ffprobe -version、HEVC デコード、h264_mf（-hw_encoding 0, pc_vbr/camera_record）2 秒エンコード、AAC 出力
+  → media-tools.lock.json の windowsRuntimeVerification は NOT_PERFORMED のまま
+- アプリ起動時の h264_mf 自己診断と、実際に採用される variant の記録
+- npm run dist:demo / dist:full の完走（Linux では NSIS 段階で wine が無く失敗。win-unpacked の構成 = media-tools/sample/docs/app.asar は確認済み）
+- インストール/アンインストール（per-user、管理者権限なし）、クリーン Windows 11 でのオフライン 90 秒体験（AC01）
+- 30 分 / 4GiB 実素材の書き出しと UI 応答性・キャンセル体感（AC06）、FULL ビルドの E2E
+- 日本語自録 5 本（許諾済み）での耳の確認。人工 fixture だけで『自然な日本語品質合格』とはしない
+- read-only 保存先、ネットワークドライブ拒否（fsutil）、容量不足の実機確認、強制終了後の復旧
+- 性能計測（広告用）: Windows 実機で h264_mf を用いて実施すること
+
+6. 性能（Linux 開発環境の参考値。広告には使わない）
+素材: 10 分 1080p30 stereo（lavfi testsrc2 + ノイズ発話 7 秒/無音 1.5 秒の繰り返し、libx264 8Mbps、約 395MB）
+機材: Intel Xeon 2.10GHz 4 コア、RAM 16GiB、SSD（コンテナ）、dev encoder libx264 veryfast
+- probe（全パケット走査 + 先頭フレーム）: 0.75 秒
+- 音量解析（f32le ストリーム → 20ms RMS）: 2.4 秒、ffmpeg peak RSS 55MB、候補 70 件、除去 81.7 秒
+- 書き出し 1080p30（15,550 フレーム）: 181.8 秒（約 3.3 倍速）、ffmpeg peak RSS 390MB、検証合格
+- 完成物の検証: 旧方式（-count_frames で全デコード）102.9 秒 → パケット数方式に変更後 1.2 秒
+※ h264_mf（Windows Media Foundation、CPU モード）の速度・メモリは別物。Windows 実機で再計測し、その値だけを公表すること。
+
+7. 判定
+- AC02 / AC03 / AC04 / AC05 / AC07 / AC08 / AC11: Linux 自動テストで達成
+- AC09 / AC10 / AC12: 設計と自動テストで主要部分を確認、実機項目が残る
+- AC01 / AC06: 未実施（Windows 実機）
+販売準備完了とは報告しない。未達は docs/HANDOFF.txt に記録。

@@ -38,8 +38,10 @@ interface StreamRow {
 }
 
 export async function verifyOutput(tools: MediaTools, file: string, expectedFrames: number, expectedWidth: number, expectedHeight: number, expectedChannels: number, signal?: AbortSignal): Promise<OutputVerification> {
+  // 映像フレーム数は MP4 のサンプル数(= パケット数、1 パケット 1 フレーム)で数える。
+  // -count_frames は 1080p 全体のデコードが必要で 10 分素材に 100 秒以上かかるため使わない。
   const probe = await runTool(tools.ffprobe, {
-    args: ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', '-count_frames', file],
+    args: ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', '-count_packets', file],
     timeoutMs: 30 * 60_000,
     stallTimeoutMs: 5 * 60_000,
     ...(signal ? { signal } : {})
@@ -74,7 +76,7 @@ export async function verifyOutput(tools: MediaTools, file: string, expectedFram
   const audioOk = Math.abs(audioDiff) <= EXPORT_TOLERANCE.audioDurationMs;
   if (!audioOk) problems.push(`音声長の差が ${audioDiff.toFixed(1)}ms(許容 ±${EXPORT_TOLERANCE.audioDurationMs}ms)`);
 
-  const actualFrames = Number(v.nb_read_frames ?? NaN);
+  const actualFrames = Number(v.nb_read_packets ?? NaN);
   const framesOk = actualFrames === expectedFrames;
   if (!framesOk) problems.push(`映像フレーム数 ${actualFrames} ≠ 期待 ${expectedFrames}`);
 

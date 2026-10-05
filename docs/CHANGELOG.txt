@@ -6,7 +6,8 @@ Maqiri CHANGELOG
 - 解析: 20ms RMS(チャンネル別最大) → quiet run → 候補 [s+padBefore, e-padAfter) を 30fps 整数フレームへ内側丸め、和集合化、600 上限
 - 編集: 自然に/ゆったり/短く、残す間、検出する長さ、詳細(閾値/前後余白)、この間を残す、端点 1f 調整、Undo/Redo 100、波形、候補一覧(仮想化)
 - 試聴: カット前後 2 秒を書き出しと同じ graph で 720p 生成、元/編集後の切替、revision で無効化
-- 書き出し: 単一 filter_complex_script、h264_mf(Windows, CPU モード既定)、AAC、30fps CFR、48kHz、faststart、ffprobe 検証(フレーム数/音声長 48ms/終端差 50ms)
+- 書き出し: 単一 filter_complex_script、h264_mf(Windows, CPU モード既定)、AAC、30fps CFR、48kHz、faststart、ffprobe 検証(フレーム数=パケット数/音声長 48ms/終端差 50ms)
+- 元プレビュー: HEVC 入力は 720p proxy を自動生成。全体の確定プレビュー(低画質)を明示操作で生成
 - 保存: .maqiri.json schemaVersion 1、自動保存(1s debounce、tmp→fsync→rename、.bak)、回復候補、最近の一覧、再リンク(SHA-256 一致)
 - 配布: APP_EDITION=demo/full の 2 ビルド(先頭 90 秒制限は main で強制)、NSIS per-user x64、未署名
 - 署名: 未署名（証明書未設定）。SmartScreen 警告が出ます。
