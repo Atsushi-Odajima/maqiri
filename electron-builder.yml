@@ -1,0 +1,55 @@
+# electron-builder 共通設定。edition(demo/full)は scripts/dist.mjs が環境変数と extraMetadata で切り替える。
+appId: jp.maqiri.app
+productName: Maqiri
+copyright: Copyright © 2026 Maqiri
+directories:
+  output: release/${env.APP_EDITION}
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  - "!**/*.map"
+asar: true
+extraResources:
+  - from: resources/media-tools/win32-x64
+    to: media-tools/win32-x64
+    filter:
+      - ffmpeg.exe
+      - ffprobe.exe
+      - LICENSE.txt
+      - manifest.json
+  - from: resources/media-tools/source
+    to: media-tools/source
+  - from: resources/sample
+    to: sample
+    filter:
+      - "*.mp4"
+  - from: docs/dist
+    to: docs
+  - from: media-tools.lock.json
+    to: media-tools/media-tools.lock.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: Maqiri-${env.APP_EDITION_LABEL}-Setup-x64.${ext}
+  requestedExecutionLevel: asInvoker
+  # 署名証明書が無い場合は未署名ビルドになる(RELEASE_CHECKLIST 参照)。署名を偽らない。
+  signAndEditExecutable: true
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ${productName}
+  license: docs/dist/EULA_DRAFT.txt
+  language: "1041"
+  installerLanguages:
+    - ja_JP
+  artifactName: Maqiri-${env.APP_EDITION_LABEL}-Setup-x64.${ext}
+publish: null

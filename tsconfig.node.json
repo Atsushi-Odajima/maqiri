@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "rootDir": "."
+  },
+  "include": [
+    "electron.vite.config.ts",
+    "vitest.config.ts",
+    "vitest.media.config.ts",
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/domain/**/*.ts",
+    "src/media/**/*.ts",
+    "src/shared/**/*.ts",
+    "tests/domain/**/*.ts",
+    "tests/media/**/*.ts"
+  ]
+}

@@ -1,0 +1,65 @@
+/* R01 Maqiri ブランド数値仕様(03_brand_and_ui_spec)をそのまま CSS variables に置く。 */
+:root {
+  --paper: #efe6d8;
+  --surface: #f8f3eb;
+  --ink: #27221e;
+  --muted: #655b52;
+  --accent: #d75936;
+  --action: #a83923;
+  --action-text: #fff9f0;
+  --action-hover: #88301f;
+  --action-active: #702919;
+  --border: #bfb4a6;
+  --border-functional: #817365;
+  --success: #31594d;
+  --warning: #754d14;
+  --error: #a42a2a;
+  --selected: #efcab4;
+  --row-hover: #e7dccd;
+
+  --font-sans: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+  --font-serif-ja: 'Noto Serif JP', 'Hiragino Mincho ProN', serif;
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-mono: 'DM Mono', 'Consolas', monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  --radius-surface: 8px;
+  --radius-button: 6px;
+  --radius-input: 6px;
+  --radius-dialog: 12px;
+
+  --header-h: 72px;
+  --actionbar-h: 72px;
+  --footer-pad: 88px;
+  --container-max: 1440px;
+  --container-pad: 32px;
+  --grid-gap: 24px;
+
+  --shadow-dialog: 0 12px 40px rgba(39, 34, 30, 0.18);
+  --motion: 120ms;
+}
+
+@media (max-width: 1279px) {
+  :root {
+    --container-pad: 24px;
+  }
+}
+@media (max-width: 959px) {
+  :root {
+    --container-pad: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0ms;
+  }
+}

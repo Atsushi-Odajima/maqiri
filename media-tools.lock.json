@@ -1,0 +1,76 @@
+{
+  "$comment": "Maqiri が同梱する検証済みメディアツールの固定定義。実行時に latest リンクを引かず、ここに記載した URL と SHA256 のみを使う。値は 2026-10-05 にこのリポジトリの作業環境(Linux)で実際にダウンロード・計算した。Windows 実機での動作確認(ffprobe/H.264/HEVC デコード/h264_mf/AAC 出力)は docs/TEST_REPORT.txt の記録に従う。",
+  "lockVersion": 1,
+  "recordedAt": "2026-10-05",
+  "tools": {
+    "win32-x64": {
+      "provider": "BtbN/FFmpeg-Builds (GitHub Releases, autobuild)",
+      "variant": "win64-lgpl (static, LGPL v3, --enable-version3, GPL/nonfree なし)",
+      "ffmpegVersionString": "n8.1.3-14-g330caae0c1-20261005",
+      "ffmpegReleaseBranch": "release/8.1",
+      "ffmpegBaseTag": "n8.1.3",
+      "ffmpegCommit": "330caae0c1acccd2222edc52a05940c574561ce5",
+      "ffmpegCommitTree": "e776b7dee8d68716059eade0e772f3b9bbf66df2",
+      "releaseTag": "autobuild-2026-10-05-13-07",
+      "archive": {
+        "fileName": "ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-8.1.zip",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-05-13-07/ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-8.1.zip",
+        "sizeBytes": 170540881,
+        "sha256": "c7b6c64484393593e372e297f629f1434ed7aaf8e635ecbf0c971d1e25f4308b"
+      },
+      "files": {
+        "ffmpeg.exe": {
+          "archivePath": "ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-8.1/bin/ffmpeg.exe",
+          "sizeBytes": 134092288,
+          "sha256": "b176698293f5a58e4e8496c88de3e494747bf1a5c39c7da2ba987d1930e9bda4"
+        },
+        "ffprobe.exe": {
+          "archivePath": "ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-8.1/bin/ffprobe.exe",
+          "sizeBytes": 133886976,
+          "sha256": "0e804549c28fd257121ee874ad28a96b4188442cd13c37a0eb92f6535bfd7057"
+        },
+        "LICENSE.txt": {
+          "archivePath": "ffmpeg-n8.1.3-14-g330caae0c1-win64-lgpl-8.1/LICENSE.txt",
+          "sizeBytes": 7651,
+          "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+          "note": "GNU Lesser General Public License v3 (ビルドに同梱された LICENSE.txt)"
+        }
+      },
+      "license": {
+        "spdx": "LGPL-3.0-or-later",
+        "summary": "FFmpeg LGPL v3 構成 (--enable-version3)。--enable-gpl / --enable-nonfree なし。libx264 / libx265 は --disable。h264_mf / hevc_mf / aac_mf (Windows Media Foundation) はバイナリ内に存在することを文字列で確認済み。",
+        "configureFlags": "--prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=x86_64-w64-mingw32- --arch=x86_64 --target-os=mingw32 --disable-w32threads --enable-pthreads --disable-debug --disable-avisynth --disable-frei0r --disable-libdavs2 --disable-libdrm --disable-libdvdnav --disable-libdvdread --disable-libfdk-aac --disable-libpulse --disable-librubberband --disable-libvidstab --disable-libx264 --disable-libx265 --disable-libxavs2 --disable-libxcb --disable-libxvid --disable-whisper --disable-xlib --enable-amf --enable-chromaprint --enable-cuda-llvm --enable-ffnvcodec --enable-fontconfig --enable-gmp --enable-iconv --enable-lcms2 --enable-libaom --enable-libaribb24 --enable-libaribcaption --enable-libass --enable-libbluray --enable-libdav1d --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libharfbuzz --enable-libjxl --enable-libkvazaar --enable-liblcevc-dec --enable-libmp3lame --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libplacebo --enable-librav1e --enable-librist --enable-librsvg --enable-libshaderc --enable-libsnappy --enable-libsoxr --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libtheora --enable-libtwolame --enable-libuavs3d --enable-libvmaf --enable-libvorbis --enable-libvpl --enable-libvpx --enable-libvvenc --enable-libwebp --enable-libxml2 --enable-libzimg --enable-libzmq --enable-libzvbi --enable-lv2 --enable-lzma --enable-openal --enable-opencl --enable-schannel --enable-sdl2 --enable-vaapi --enable-vapoursynth --enable-version3 --enable-vulkan --enable-zlib --extra-cflags=-DLIBTWOLAME_STATIC --extra-ldflags=-pthread --extra-libs=-lgomp --extra-version=20261005",
+        "configureFlagsSource": "ffmpeg.exe 内の configuration 文字列を strings で抽出 (2026-10-05)"
+      },
+      "correspondingSource": {
+        "ffmpeg": {
+          "repository": "https://github.com/FFmpeg/FFmpeg (ミラー: https://git.ffmpeg.org/ffmpeg.git)",
+          "commit": "330caae0c1acccd2222edc52a05940c574561ce5",
+          "tree": "e776b7dee8d68716059eade0e772f3b9bbf66df2",
+          "archiveOutput": "resources/media-tools/source/ffmpeg-330caae0c1.tar.gz",
+          "method": "git fetch --depth 30 origin release/8.1 && git archive --prefix=ffmpeg-330caae0c1/ <commit>"
+        },
+        "buildScripts": {
+          "repository": "https://github.com/BtbN/FFmpeg-Builds",
+          "observedCommit": "9acad4a9ef1583096af7836cc1e9c8cbcb4d3950",
+          "observedAt": "2026-10-05",
+          "archiveOutput": "resources/media-tools/source/ffmpeg-builds-scripts-9acad4a9.tar.gz",
+          "note": "autobuild 成果物には使用したビルドスクリプトのコミットが記録されないため、同日に観測した main ブランチの HEAD を記録した。依存ライブラリ(libopus, libvpx 等)のソースはこのスクリプト群(scripts.d/)が取得する版に従う。配布時には third-party ソースの提供方法を docs/THIRD_PARTY_NOTICES.txt に明記する。"
+        }
+      },
+      "windowsRuntimeVerification": {
+        "status": "NOT_PERFORMED",
+        "required": [
+          "ffprobe.exe -version が n8.1.3-14-g330caae0c1 を返す",
+          "H.264 / HEVC(8bit) のデコード",
+          "h264_mf (hw_encoding=0) で 30fps 1080p を 2 秒エンコード",
+          "aac エンコード 48kHz stereo/mono",
+          "docs/TEST_REPORT.txt に機材・日付・結果を記録"
+        ]
+      }
+    }
+  },
+  "devHostFallback": {
+    "note": "Windows 以外の開発ホストでは、テスト実行のためにシステムの ffmpeg/ffprobe (PATH) を使う。h264_mf は存在しないため、テスト専用に libx264 等を 'dev encoder' として明示的に使う。配布物には含めない。"
+  }
+}

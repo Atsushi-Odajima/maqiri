@@ -1,0 +1,17 @@
+node_modules/
+out/
+dist/
+release/
+resources/media-tools/win32-x64/
+resources/media-tools/downloads/
+resources/media-tools/source/
+resources/sample/*.mp4
+tests/fixtures/generated/
+tests/e2e/.artifacts/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+Thumbs.db
+tests/perf/.result.json
+tests/.build/

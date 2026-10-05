@@ -1,0 +1,217 @@
+/* S0 開始 */
+.start {
+  padding-top: var(--space-12);
+}
+.start-grid {
+  align-items: start;
+}
+.start-copy {
+  padding-right: var(--space-6);
+}
+.conditions {
+  margin: var(--space-2) 0 0;
+  padding-left: 20px;
+}
+.conditions li {
+  margin: 2px 0;
+}
+.recent-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  border-top: 1px solid var(--border);
+}
+.recent-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-4);
+  align-items: center;
+  text-align: left;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  min-height: 48px;
+}
+.recent-row:hover {
+  background: var(--row-hover);
+}
+
+/* S1 */
+.load {
+  padding-top: var(--space-8);
+}
+.info-grid {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+.info-grid dt {
+  color: var(--muted);
+  font-size: 14px;
+}
+.info-grid dd {
+  margin: 0;
+}
+
+/* S2 */
+.edit {
+  padding-top: var(--space-6);
+}
+.edit-title .title-input {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0 4px;
+  border-radius: var(--radius-input);
+  width: min(100%, 640px);
+}
+.edit-title .title-input:hover,
+.edit-title .title-input:focus {
+  border-color: var(--border-functional);
+  background: var(--surface);
+}
+.video-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.video-preview.portrait {
+  aspect-ratio: 16 / 9;
+}
+.video-preview video {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+  background: var(--ink);
+}
+.video-label {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  z-index: 1;
+}
+.video-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.preset-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.preset-row .btn {
+  flex: 1 1 0;
+  padding: 0 8px;
+}
+.btn.selected {
+  border: 2px solid var(--action);
+  background: var(--selected);
+}
+.setting .note {
+  margin-top: -4px;
+}
+.waveform-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+.candidate-list {
+  overflow: hidden;
+}
+.candidate-head,
+.candidate-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 1fr 1fr 96px auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: 0 var(--space-3);
+}
+.candidate-head {
+  height: 32px;
+  border-bottom: 1px solid var(--border);
+}
+.candidate-scroll {
+  overflow-y: auto;
+  position: relative;
+}
+.candidate-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.candidate-row:hover {
+  background: var(--row-hover);
+}
+.candidate-row.selected {
+  background: var(--selected);
+  box-shadow: inset 2px 0 0 var(--action);
+}
+.candidate-row .num {
+  font-size: 15px;
+}
+.junction-videos video {
+  width: 100%;
+  max-height: 360px;
+  background: var(--ink);
+  border-radius: var(--radius-surface);
+}
+.actionbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--actionbar-h);
+  background: var(--paper);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  z-index: 10;
+}
+.actionbar .container {
+  width: 100%;
+}
+
+/* S4 / S5 */
+.done,
+.settings {
+  padding-top: var(--space-8);
+}
+
+@media (max-width: 959px) {
+  .start-copy {
+    padding-right: 0;
+  }
+  .recent-row {
+    grid-template-columns: 1fr;
+  }
+  .candidate-head,
+  .candidate-row {
+    grid-template-columns: 28px 1fr 1fr 72px auto;
+  }
+  .candidate-head span:nth-child(3),
+  .candidate-row > :nth-child(3) {
+    display: none;
+  }
+}

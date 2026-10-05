@@ -1,0 +1,47 @@
+{
+  "name": "maqiri",
+  "productName": "Maqiri",
+  "version": "1.0.0",
+  "description": "長い間を、短く。話し方は、そのまま。 - 話す動画の長い無音を見つけて詰める Windows アプリ",
+  "private": true,
+  "license": "SEE LICENSE IN docs/EULA_DRAFT.txt",
+  "main": "./out/main/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "media:prepare": "node scripts/prepare-media-tools.mjs",
+    "media:verify": "node scripts/prepare-media-tools.mjs --verify-only",
+    "fixtures": "node scripts/generate-fixtures.mjs",
+    "sample": "node scripts/generate-sample.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run --config vitest.config.ts",
+    "test:media": "node scripts/generate-fixtures.mjs && vitest run --config vitest.media.config.ts",
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.ts",
+    "dev": "electron-vite dev",
+    "build": "node scripts/generate-sample.mjs && electron-vite build",
+    "dist:demo": "node scripts/dist.mjs demo",
+    "dist:full": "node scripts/dist.mjs full",
+    "contrast:check": "node scripts/check-contrast.mjs"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "44.5.1",
+    "electron-builder": "^26.15.0",
+    "electron-vite": "^5.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.0",
+    "vitest": "^5.0.0",
+    "zustand": "^5.0.0"
+  }
+}

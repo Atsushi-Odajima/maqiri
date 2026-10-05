@@ -1,0 +1,290 @@
+R01 Maqiri（マキリ）完全版 Claude Code 開発指示
+仕様版1.0 / 2026-10-06（日本時間）
+
+あなたはWindowsデスクトップ動画アプリを実装する担当者です。この文書と同梱素材を正本として、実装・テスト・ローカル起動・配布用ビルドまで進めてください。機能の提案だけで止まらず、実装物を作ってください。ただしストア公開、決済開始、署名用秘密鍵の作成/送信、第三者への連絡はこの指示の範囲外です。
+この文書を納品した時点でアプリが動作するという意味ではありません。実行していないテストを合格と報告しないでください。
+
+0. 最優先の成果
+1本の話す動画を読み込む。長い低音量区間を自動で見つける。間隔を調整し、つなぎ目を聞き、必要な間を残して、短くなったMP4を書き出す。
+ユーザーにffmpegのインストール、ターミナル、クラウドアカウント、APIキーを要求しない。
+元動画を上書き・削除しない。解析や変換のために素材を外部送信しない。
+『字幕が付く』『フィラーが消える』『話の意味を理解して選ぶ』機能はない。UIやLPで暗示しない。
+対象はBGMを加える前の単独話者の講座、解説、商品紹介。既存動画ソフトの全面再実装はしない。
+
+1. 販売と範囲
+想定価格4,980円買い切り。価格検証前なので実際の決済は実装しない。
+FULL版：30分/4GiB以内の1素材。DEMO版：入力の先頭90秒だけを処理・出力。透かしなし。制限を素材選択前とエクスポート前に表示。
+同一コードからAPP_EDITION=demo/fullの2ビルド。境界はmain側で強制。デモは90秒までの元時刻しか解析/選択できない。編集後90秒ではない。
+販売プラットフォームでFULLインストーラーZIPを自動納品する方式。ライセンスサーバーも強いDRMもない。自動納品設定そのものは本実装に含めない。1人の購入者が自分のPCで使う利用条件と、OSS部分の権利を分けたライセンス文面の草案を同梱。違法コピーを完全防止できるとは言わない。
+Windows11 x64を初回対象とする。メモリ8GiB以上、16GiB推奨は初期の検証目標であり実測前に最低動作保証へ転記しない。
+PWA非対応。iPhone/Android/Macネイティブ非対応。ブラウザ内ffmpeg.wasmや動画アップロードサーバーへ置き換えない。
+
+実装しないもの：字幕/文字起こし/生成AI/フィラー削除/話者識別/マルチカメラ/音楽追加/テキストテロップ/写真テンプレート/素材売買/広告/投稿/ユーザー登録/クラウド同期/4K/HDR/60fps出力/編集ソフト向けXML。
+将来拡張のための抽象化はドメインと処理アダプターまで。未提供ボタンやComing Soonタブは置かない。
+
+2. 技術構成
+Electron（着手日の保守中安定版）、TypeScript strict、React、Vite。electron-viteまたは同等のmain/preload/renderer分離構成。依存はpackage-lock.jsonに固定しnpm ci可能にする。
+UI：CSS variablesと自作部品、Noto Sans JP/Newsreader/DM Monoを同梱。汎用ダッシュボードテンプレートを流用しない。
+state：Zustand。validation：Zod。tests：Vitest、Playwright Electron、実ffmpeg CLI統合テスト。
+解析：Node utility process/worker_threadsでストリーミングPCMからRMSを計算。rendererに生PCMを全部渡さない。
+変換：同梱FFmpeg/ffprobeをmainからspawn（shell:false）する。child argsは配列、任意シェル/ユーザー入力フィルタを許さない。
+出力動画：H.264/AAC MP4、30fps CFR、48kHzステレオまたはモノ。映像は最大1920×1080相当（縦動画1080×1920可）、縦横比維持、拡大禁止。
+FFmpegはLGPL構成を選び--enable-gpl/--enable-nonfreeなし。H.264はWindows Media Foundation h264_mfを採用。GPL x264を無断追加して『同じLGPL構成』と扱わない。
+開発初日に使用するFFmpeg buildを実際に選定し、Windows上でffprobe/H.264/HEVCデコード/h264_mf/AAC出力を確認。scripts/prepare-media-tools.mjsとmedia-tools.lock.jsonへ、正確な版・URL・SHA256・ライセンス・構成・対応ソースのURLを固定。latestリンクを実行時に毎回引かない。
+配布版には検証済みバイナリと対応ソース/ビルド手順/ライセンスを収録。ユーザーによる初回ネットダウンロードに依存しない。ダウンロード元が確証できなければ本物の取得手順を報告し、偽のchecksumやURLを作らない。
+h264_mfの利用可否は起動時に2秒の同梱テストで確認。CPUソフトウェアモードを既定とし、具体的オプションは固定版の-h encoder=h264_mfで確認しテストに固定。未対応ならE_ENCODER、環境情報と対処を提示する。別コーデックへ黙って変えない。
+性能の理由でHWモードを追加する場合も同一の検証ゲートを通す。v1に必須ではない。
+
+構成
+src/main/：IPC、プロジェクトIO、tool監視、エクスポート。
+src/preload/：許可済みAPIだけ。
+src/renderer/：画面/部品。
+src/domain/：音量分類、候補作成、フレーム区間、undo、時間変換。OS依存なし。
+src/media/：probe、PCM、filter生成、preview、export。
+src/shared/：Zod schemas/IPC型。
+resources/media-tools/：検証済み実行ファイル。
+resources/fonts/：同梱assets/fonts。
+tests/fixtures/：人工動画音声、期待値、出典。
+docs/：SETUP_WINDOWS.txt、TEST_REPORT.txt、RELEASE_CHECKLIST.txt、HANDOFF.txt、THIRD_PARTY_NOTICES.txt。
+
+3. 素材条件と読み込み
+拡張子MP4/MOVだけでなくffprobeのcontainer/stream実体を確認。映像1本＋選択した音声1本が必須。映像attached_picは除外。
+H.264またはHEVC、SDR 8bit、progressive、25/29.97/30/50/59.94/60fpsおよびVFRの一般的な録画を対象。HDR(PQ/HLG)、Dolby Vision、interlace、10bit以上、4K、破損、暗号化はv1ではE_FORMATで拒否。HEVC→H.264変換に時間がかかる旨は許可前に表示。
+縦横回転をprobeしデコード時のautorotateと手動回転を二重適用しない。rotate/displaymatrixを正規化し出力には二重回転メタデータを残さない。sample aspect ratioも表示縦横比に反映。
+動画最長30分、4GiB、縦横の長辺1920/短辺1080以内（回転後）。動画の時間は取得可能なPTS基準で計算。0秒/負/非有限は拒否。
+音声はmono/stereoのAAC/PCM。複数音声なら選択必須、既定は最初のdefaultトラックを提案。採用トラックだけ出力し、その他を削除することを確認画面に表示。無音トラックを声のトラックと誤認したまま出力しない。
+音声なしE_NO_AUDIO。音声が動画全体より短い場合は末尾を無音で埋める。開始ずれも以下の共通時刻へ合わせる。
+ネットワークURL・プレイリスト・ディレクトリは入力不可。パス文字列をコマンドとして解釈しない。シンボリックリンクは実体を解決し、選択元以外へリンクがすり替わったら再承認。
+ファイル選択時はprobe/hashを別工程に分け進捗表示。4GiBを全メモリ読込せずsha256をストリーム計算。
+
+4. 時刻の正本と同期
+本製品は30fpsの整数フレームを正本とする。保存するカット範囲は半開区間[startFrame,endFrame)。エンドフレームは残す側。サンプルは48,000Hz、1出力フレーム=1,600音声サンプル。
+元の最初の表示映像PTSをT0とし、全映像/音声を同じT0からの時刻へ正規化。映像と音声をそれぞれ独立にSTARTPTS=0にして、元から存在する音声遅延を失わない。
+probeのstream start_timeだけを盲信せず、最初のdecoded frame/packet情報を確認。負PTS、B-frame、audio delayのfixtureを用意。
+映像はT0基準のfps=30:start_time=0でCFR化。音声は同T0に対するPTS、aresample=48000:async=1:first_pts=0で先頭/途中の時刻を合わせる。必要な先頭無音挿入/先頭トリムの扱いをテストで固定。
+Dは映像の正規化後長さ。N=ceil(D*30)。最後の映像不足は最後のフレームで埋めN枚へ、音声はapadとatrimでN*1600samplesへ整える。終了時の余分な長さは最大1/30秒。DEMOは元の90秒(N<=2700)でクリップ。
+解析と書き出しは同じ時刻正規化関数を使う。音量解析用PCMの0点と映像0点が一致していることを検証する。
+RMS解析用に48kHz元チャンネルPCM f32leをストリームで生成。20ms=960samples/chごとにチャンネル別RMS、採用RMS=max(channel RMS)。ステレオを単純平均して逆相の声を消さない。dBFS=20*log10(max(RMS,1e-8))、下限-160。
+
+5. 自動判定
+thresholdDb：既定-35dBFS、[-60,-15]、1dB刻み。『小さい音も残す』方向は数値をより負にする。説明に具体例を書く。
+quiet判定：20ms窓の全チャンネルRMSが閾値未満（等しい場合は保持）。連続quietを候補runへ。途中の音あり20msでも別runにする。短い有声音の自動削除や穴埋めはしない。
+minSilenceMs：既定800、範囲[400,3000]、50刻み。
+padBeforeMs（直前の発話後を残す）：150、[80,600]、10刻み。
+padAfterMs（次の発話前を残す）：150、[80,600]、10刻み。
+初心者UIでは合計300msを『残す間0.30秒』と表示、変更時は半分ずつへ。詳細欄で別々に指定可。『声の前後を保護する余白。元に存在する無音だけを残す』と補足。
+プリセット：自然に=-35/800/150/150、ゆったり=-38/1200/250/250、短く=-32/600/100/100（順に閾値/最小無音/前余白/後余白）。短くは切れやすさに注意を添える。
+run [s,e)でe-s>=minSilenceかつ除去長が0.1秒以上なら、削除案[s+padBefore,e-padAfter)。0/Dにクリップ。先頭末尾も同ルール、v1は全冒頭末尾を強制削除しない。
+安全丸め：a=ceil(startSeconds*30)、b=floor(endSeconds*30)。b-a>=3のみ候補。削る時間を拡大する外側丸めはしない。
+重なる/接する候補は和集合化。最大候補数600。超えたら閾値/最小無音調整を促し、超過部分だけを黙って捨てない。
+ほぼ全無音（判定quiet比率95%以上）/除去候補0/残り1秒未満は専用状態。全無音は誤トラックの確認と『編集せず保存』を案内し、空MP4は作らない。
+常時BGMや大きな環境音では無音を検出できない場合がある。BGM分離・高度VADのあるふりをしない。
+
+例：run[10.000,12.000)、自然に→削除[10.150,11.850)秒→frame[305,355)、50frames=1.666…秒除去。画面の小数表示を正本へ逆変換しない。
+音声語尾は閾値判定だけでは保証できない。前後を聞く操作を明確にする。『声を絶対に切らない』と言わない。
+
+6. 手直し・プレビュー
+候補一覧は元時刻で昇順、各行に開始/終了/除去秒/採用・保持を表示。『この間を残す』で候補をdisabled=trueにし元映像が復活。
+任意の発話削除、台詞選択、トラック追加はv1なし。候補端点を30fps単位で動かせるが元quiet run内だけ。保護余白を割る場合は警告を表示。開始<終了を強制。
+設定変更で再解析するとmanualOverridesは元フレーム区間として残す。保持領域と交差した新候補はその交差分を削除案から差し引く。フラグだけを候補indexへ付け直して誤った間を戻さない。
+手動保持が増えて複数候補に分かれたら短い削除区間(3frames未満)を捨てる。『手動保持もリセット』は別ボタン、取り消し可能。
+Undo/Redo100操作。設定変更・保持・端点変更を一操作。解析進捗イベントは履歴に入れない。
+元プレビュー：選択元か720p proxy。proxyは動画全長とT0を保持、編集位置は元時刻へ対応。
+概略再生：HTML videoのseekで削除区間を飛ぶ。『概略プレビュー』と明示し、ブラウザseekを最終精度と見なさない。
+正確なつなぎ目：選択カットの前2秒/後2秒を同じexport graphとフレーム規則で720p一時MP4に生成し、元版と編集版を切り替えて聞く。変更revisionごとに無効化しstaleな再生をしない。2秒未満なら動画端でクリップ。
+全体の確定プレビューは必要なら低ビットレートで生成（明示的操作、設定変更ごとの自動全再変換はしない）。
+process同時数1。probe/解析/preview/exportの優先順位はexport>preview>analysis。実行中ジョブを並列乱立させず取り消して切り替える。
+
+7. 正確な書き出し方式
+映像/音声に同じ整数削除範囲を適用。-c copyによるキーフレーム切断は初回では使わない。
+動画：T0正規化→fps30→Nへclamp→select式（削除区間[a,b)に属するnを除外）→setpts=N/(30*TB)→scale/SAR正規化→h264_mf。
+音声：T0正規化→48kHz→N*1600へpad/trim→asetnsamples=n=1600:p=1→動画と同じnでaselect→asetpts=N/SR/TB→AAC。
+ここで映像setptsのNはそのフィルタでの出力フレーム番号、音声asetptsのNは出力サンプル番号。プロジェクト総フレームNと変数の意味を混同しない。filter builderはコメントを付ける。
+削除式はsum(between(n,a,b-1))>0、保持はnot。1つのfilter_complex_scriptに生成しWindowsコマンド長の上限を避ける。数値は整数で検証。外部任意文字を式に埋めない。
+チャンネル数は選択音声を維持。映像/音声を選ぶ-mapを明示、字幕・添付物・余分なメタデータを出力しない。30fps、48kHz、AAC192kbps(stereo)/128kbps(mono)。1080p映像目標12Mbps/720p6Mbps。MFのVBR/CBR対応を固定buildで確認し、実際に使用した設定をexport reportへ記録。
+色：SDR BT.709に統一し、正しい入力情報がある場合変換、出力タグを一致。タグ不明なら『SDR BT.709として処理』を通知し、色を保証しない。透明動画は対象外。
+出力寸法は縦横比を守り、偶数辺へ丸める。ピクセル拡大はしない。fpsは30に統一（25fps入力も30化）。MP4 faststart。音量の正規化/ノイズ除去/クロスフェードは初回なし。
+カットは低音量区間内であり音の跳ねを低減しやすいがゼロクリック保証ではない。問題箇所は保持で戻す。
+
+出力フレーム数E=N-sum(b-a)。予定出力時間E/30。ffprobeで完成物の映像フレーム数・音声長・codecを検証。音声encoder delay/paddingはコンテナを含めて検証し、各カットでAACを別エンコードして繋がない（遅延が累積するため）。
+許容：映像フレーム数はEと一致。decoded audio長の差はAAC最終padding等の処理を考慮して48ms以内、PTS上のA/V終端差は50ms以内、人工同期マーカーのズレは各地点1frame以内。いずれか不合格なら成功画面を出さずE_SYNCと診断。
+検証基準は希望的な記載で終わらせず、実機fixtureの結果をTEST_REPORTへ残す。MFで安定しない環境ではサポート対象を狭め、その根拠を示す。
+
+8. 保存/プロジェクト/入出力
+形式.maqiri.json UTF-8。schemaVersion=1。最上位：product, schemaVersion, id(UUID), title(1..120), createdAt, updatedAt, source, settings, manualKeepRanges, cutRanges, revision, lastExport。
+source：basename, absolutePath, sha256, sizeBytes, mtimeMs, durationUs, firstVideoPtsUs, videoStreamIndex, audioStreamIndex, displayWidth, displayHeight, rotation, frameRateNum/Den, sampleRate, channels, codec, colorInfo。
+settings：thresholdDb,minSilenceMs,padBeforeMs,padAfterMs,outputPreset('1080p30'|'720p30')。
+manualKeepRanges/cutRanges：整数startFrame/endFrame、reason、candidateId(UUID)。cutRangesは再計算可能だが解析algorithmVersion='rms20-v1'と同じrevisionで保存。
+時刻は保存時は整数microsecondsか整数frame、浮動小数小数文字列の蓄積をしない。読み込み時すべてZod検証、unknown schemaは編集せずエラー。
+プロジェクトは画像動画を内包しない。最近の一覧はapp.getPath('userData')/recent.json。titleは画面でtextContent。絶対パスはプロジェクトにある旨を書出時に明記。
+共有用カットCSV/JSONはbasenameとhashと整数範囲だけ、絶対パスなし。CSVはUTF-8 BOM、先頭=,+,-,@の文字列へ対策して表計算数式を防ぐ。
+自動保存は変更後1000msdebounce、.tmp→fsync→rename、前版.bakを一世代残す。起動時未完了tmpを回復候補として提示し、元へ無断上書きしない。
+元ファイル移動：選び直し→hash一致なら再リンク。不一致なら『別の素材です』で中止、勝手に編集結果を適用しない。元素材へ書き込まない。
+エクスポート：既定basename_maqiri.mp4、衝突時連番。入力と同一実体パス禁止。作業は選択保存先と同volumeの一時ファイル→検証→atomic rename。上書きは明示確認。
+空き容量は予想出力（選択ビットレート×残り長さ/8×1.5）+proxy/caches+1GiBを開始前チェック。不足E_SPACE、保存先変更を案内。ネットワークドライブは初回非対応としてローカル保存を求める。
+キャッシュ：userData/cache/<projectId>/<revision>。上限2GiB、LRU、使用中ファイル除外。清掃で素材や購入ファイルを消さない。キャッシュ消去はプロジェクト消去と別操作。
+クラッシュ/キャンセル：ffmpegに終了要求→5秒以内に終了しなければchild processをkill。自分のPID/jobだけ。中断.tmpを清掃し完成名は作らない。素材は不変。
+
+9. セキュリティ
+contextIsolation=true、nodeIntegration=false、sandbox=true、webSecurity=true。CSP script-src self、remoteコードなし、evalなし。
+preload exposes pickSource/probe/analyze/generateJunction/export/saveProject/loadProject/cancelJob等の最小API。任意readFile/spawn/shell実行を公開しない。
+IPC sender/originとpayloadをmainで検証。rendererには自由なファイルパスを渡さず、mainが管理するassetId/jobIdを使う。
+メディア配信用カスタムprotocolは選択済みassetIdからmainの実体へ解決。Range要求を上限付きで処理。../../、encoded traversal、任意drive/UNC禁止。project JSONに書かれたパスだけを根拠にファイルへアクセスせず、ユーザーの選択/再リンクを要求。
+新規ウィンドウ/外部navigationを拒否。外部公式ヘルプを開く場合は固定HTTPS allowlistのみ。素材に付いたURLを開かない。
+ffmpegのnetworkプロトコルを許可しない。入力は通常ファイル、ローカルプロトコル最小限。decoderクラッシュはapp crashと分離、タイムアウト・出力ログサイズ上限を設ける。
+ログ：ユーザー名/絶対パスをmask、動画の音声・フレームは含めない。自動送信・広告SDK・アクセス解析なし。保存する診断ログ内容を本人が見られる。
+固定バイナリのhash確認。更新は初回手動ダウンロード方式。新しい未検証exeを自動実行しない。
+
+10. UXとブランド
+この文書末尾の数値UI仕様を適用。assets内のロゴSVGを正本とする。brand_board.pngの生成細字をOCRしてコード化しない。
+必要素材パス：assets/logo_horizontal.svg/png、assets/logo_mark.svg/png、assets/ui_desktop.png、assets/brand_board.png、assets/pwa_icon_192.png、assets/pwa_icon_512.png、assets/desktop.ico、assets/icons/*.svg、assets/fonts/*。
+購入UIに実装ライブラリ名やffmpegオプションを並べない。説明は『残す間』『小さい声を残す』『元の動画』等。エラー詳細は折りたたみ。
+初回から高機能エディターのトラック群を表示しない。波形は実際の音声データ。ダミーグラフ/売上カードは不可。
+
+11. Windows11での実行手順を実装後に作る
+前提：Node.js着手時のLTS x64、Git、Windows11。開発ツールとしてPowerShell。利用者にこれらを要求しない。
+README/SETUP_WINDOWSには実際に使ったNode/npm/Electron/FFmpegバージョンと検証日を記録。
+開発者用コマンド（プロジェクトroot）：
+  npm ci
+  npm run media:prepare
+  npm run typecheck
+  npm test
+  npm run test:media
+  npm run dev
+  npm run build
+  npm run dist:demo
+  npm run dist:full
+上記のscriptsをpackage.jsonへ実装。media:prepareはlockのhashとlicenseを検証。環境変数秘密値が必要な作業は必須開発手順に混ぜない。
+Electron起動して実動画を選び、素材を編集・書出しできるところまで確認。UIだけのbrowser previewをネイティブ起動成功と扱わない。
+ビルド：electron-builder/NSIS x64、per-user install、管理者権限を通常要求しない。uninstallerでアプリを削除、プロジェクト/元素材を削除しない。
+署名証明書がなければ未署名ビルドと正直に記録。SmartScreen警告を回避できると約束せず、署名を偽らない。Defenderを無効化する手順は禁止。販売公開の最終段階で所有者の証明書/署名工程を案内。
+別のクリーンWindows11環境で、Node/ffmpeg未導入、ネット切断状態で90秒体験が完了することをrelease gateとする。
+
+12. テスト項目
+A ドメイン：閾値ちょうど/±0.1dB、20ms窓境界、run=799/800ms、余白和>=run、[305,355)例、先頭末尾、重複/接触和集合、保護区間の差集合、undo/redo100、600超、全無音/全有音。
+B 音声：左だけ発話/右無音、左右逆相、極小声、一定BGM、咳、途中欠損、選択トラック違い。単純mono平均が誤判定しないこと。
+C 映像：横1080p、縦1080×1920回転metadata、720p、25/29.97/60fps、VFR、負PTS、音声+200ms遅延、音声先行、末尾短い音声。音声同期マーカーを開始/中間/末尾に置く。
+D 出力：削除0/1/600、長さE/30、正しいフレーム数、A/V許容差、画角保持、mono/stereo、同名パス、容量不足、キャンセル、強制終了、read-only保存先、長い日本語パス/絵文字、ファイル名に引用符と&。
+E セキュリティ：悪意のproject title、path traversal、未知schema、偽assetId、不正IPC sender、job別キャンセル、ネットURL入力、hash不一致、無音メディアbomb/巨大寸法拒否。
+F UX：Tab順、キーボード操作、フォーカス復帰、warningの非色依存、960×700、1280×800、1440×900、200%zoom。狭幅375pxは静止UIプレビューの欠けを確認するだけでiPhone対応を宣言しない。
+G 配布：DEMOが先頭90秒を超えない、FULL30分上限、インストール/アンインストール、オフライン、ライセンス/ソース同梱、バイナリhash。
+fixtureはFFmpeg lavfi色面+番号/ビープ/既知無音で自動生成（フォント/素材権利問題なし）。実際の日本語読み上げは許諾済み自録5本を追加し耳で聞く。自録が未提供なら人工fixtureだけで『自然な日本語品質合格』にしない。
+性能：同一Windows11機材でCPU/RAM/SSD/入力codec/長さを記録し、10分1080pの解析秒数/書出し秒数/peakRSSを計測。広告用速度はその実測のみ。処理速度目標を勝手な実績にしない。
+
+13. Acceptance Criteria
+AC01 クリーンWindows11でインストーラーから起動し、外部ネットなしにサンプルをMP4出力できる。
+AC02 音量判定とframe範囲が既知fixture期待値に一致。自然にの[10,12)例は[305,355)。
+AC03 元素材のSHA256が処理前後で同じ。元パスへの出力は禁止。
+AC04 保持した区間は再解析後も意図どおり残り、Undoで戻せる。
+AC05 境界試聴と最終出力が同じカット判定を使い、staleな結果を表示しない。
+AC06 30分/600候補を検証機で書き出し、600超は理由付き停止。UIが固まらずキャンセルできる。
+AC07 A/V同期と出力フレーム数は第7節の許容値以内。AACの区切りごとの累積ドリフトなし。
+AC08 破損/HDR/無音声/全無音/対応外codecは原因と戻り先を表示。成功を偽装しない。
+AC09 読込/書込/空き容量/中断エラーで元動画と完成済み出力を失わない。
+AC10 DEMOは先頭90秒で制限し、FULLは同じ制限を受けない。制限はmainで検査。
+AC11 素材・音声の外部通信なし。rendererにNode/任意ファイル読み込みなし。
+AC12 ブランド/画面仕様/アクセシビリティ、配布物/NOTICE/対応ソースが揃う。
+未達はHANDOFFへ正直に記録。AC未達のまま販売準備完了と報告しない。
+
+14. 販売用の配布物と引き継ぎ
+実装後に生成：Maqiri-Demo-Setup-x64.exe、Maqiri-Full-Setup-x64.exe、SHA256SUMS.txt、START_HERE_JA.txt、FORMAT_LIMITS.txt、EULA_DRAFT.txt、THIRD_PARTY_NOTICES.txt、ffmpeg対応sourceとbuild手順、CHANGELOG.txt。
+購入者ZIPと開発ソースZIPは分ける。この企画ZIPをそのまま動作アプリとして販売しない。
+開発引き継ぎ：HANDOFF.txtに変更一覧、現在版、Windows検証機、実行コマンド、テスト結果/未実施、固定FFmpeg構成、切断algorithmVersion、残課題、次の一手、既知制約を記録。
+Codex等に渡す時はmain/renderer分離・frame正本・共有T0・元素材不変・privacyを引継ぎ最優先事項にする。
+
+15. 作業順
+(1) 条件とrepoの既存指示を読む→(2) FFmpeg/MFの短い実機検証→(3) 純粋なframe計算とfixture→(4) 1本読込・1カット出力→(5) 解析・保持・同期→(6) ブランドUI→(7) 保存と復旧→(8) demo/full配布→(9) Windows受け入れテスト。
+動画書出しの成立を先に確かめる。見た目だけを完成させて書出しを後回しにしない。
+小さな実装単位で検証し、重大な未確認が残る時のみ報告。Windowsがこの開発環境にない場合でもコードと自動fixtureを完成し、Windows実施が必要な項目を未実施として分ける。
+
+以下は同梱03_brand_and_ui_spec.txtの内容。単体TXTを渡しても設計判断が欠落しないよう収録する。
+
+
+R01 Maqiri — ブランドと数値UI仕様
+
+採用方向：Splice Studio。編集前の間と編集後の連続性を、余白・切れ目・横方向のリズムで表す。
+メッセージ：長い間を、短く。話し方は、そのまま。
+約束：元動画を書き換えず、カット候補を確認して戻せる。声を変えたり意味を要約したりしない。
+トーン：大人向け、穏やか、録音機材の明快さ。若者向けエフェクト・バズ表現を足さない。
+
+色
+paper #EFE6D8：基本背景。surface #F8F3EB：入力面。
+ink #27221E：本文/映像外の濃い面。muted #655B52：補助文字。
+accent #D75936：カット候補の輪郭・演出色。小さい本文には使わない。
+action #A83923：主要ボタン背景、文字#FFF9F0。hover #88301F。
+border #BFB4A6：装飾的な区切り。入力・選択領域の機能的な境界は#817365。success #31594D、warning #754D14、error #A42A2A。
+selected面 #EFCAB4、文字ink、2px action罫。色だけで切断/保持を区別せず、網掛け・ラベル併用。
+本文コントラスト4.5:1、大見出し/非テキスト3:1以上を実装時に自動検査。任意の画像上に小さい文字を直置きしない。
+
+文字
+ロゴ：Newsreader Italic、weight500、optical size60、SVGアウトライン正本。
+大見出し：Newsreader regular/italic 500、48px/1.05、letter-spacing -0.03em。和文見出しNoto Sans JP 600、30px/1.4、-0.02em。
+本文/操作：Noto Sans JP 450、16px/1.6、0em。補足14px/1.5、450。小さい英ラベルDM Mono400、12px/1.5、0.04em。
+時間・dB・秒数：DM Mono400、18px/1.4、tabular numbers。メイン時間32px/1.2。
+ブランド宣言の和文大見出しのみNoto Serif JP 600、48〜96px/1.15、letter-spacing -0.03em。操作画面には流用しない。
+4系統の書体をassets/fontsからローカル配信。外部フォントCDN禁止。全てSIL OFL原文同梱。
+
+配置
+spacing：4,8,12,16,24,32,48,64,96px。8px基本、4px補正。
+メインcontainer：max1440px、左右32px、幅100%。1280px未満24px。ネイティブ最小ウィンドウ960×700。
+12列グリッド、gap24px。編集画面は上に8列の映像・4列の短い設定、下は全幅の1本の波形。左サイドバーなし。
+960〜1199pxは映像7列＋設定5列。幅960px未満のWeb UIプレビューは1列、左右16px。スマホの操作可能アプリとは表示しない。
+header72px。編集の主要操作bar72px。フッターは内容を隠さずpadding-bottom88px確保。本文スクロールと波形横スクロールを分離。
+border1px。選択2px。radius：画面面8px、button6px、input6px、dialog12px。pill多用しない。
+shadow：通常なし。dialogのみ0 12px 40px rgba(39,34,30,.18)。ガラス/発光なし。
+button48px高、primary52px、左右20px。input48px、textarea最小96px。アイコン20px、hit area44px以上。
+
+操作状態
+hover：ボタン濃度変更、行は#E7DCCD、位置は動かさない。
+focus-visible：3px #A83923 outline、offset3px、濃背景上はpaper二重リング。
+active：背景#702919、translateなし。selected：2px罫＋チェック/保持ラベル。
+disabled：ink40%+paper面。理由を隣のテキストで説明、色だけにしない。
+loading：段階名と実測進捗を表示。時間不明は『解析中』。擬似的に99%に張り付かせない。キャンセル常設。
+empty：動画を選ぶ＋10秒の同梱サンプルを試す。KPI空カードは表示しない。
+success：保存先、再生、フォルダーを開く。処理数を実績風に見せない。
+warning：『小声がカット候補に含まれることがあります』と閾値を下げる/前後を聞く。
+error：コード＋日本語の原因＋次操作。例E_FORMAT→対応形式表示と選び直す、E_SPACE→保存先変更、E_ENCODE→ログ保存/再試行。
+動き：120ms opacity/color、prefers-reduced-motionで停止。波形を装飾として勝手に動かさない。
+
+S0 開始
+目的：編集を始める。最重要：対応条件と素材選択。主操作『動画を選ぶ』。
+優先：主操作→サンプル→最近の3件→対応条件。PCは大きな左タイポ＋右ファイル選択面、下に最近の行。
+狭幅は縦順。非Windowsブラウザでは『Windowsアプリの画面見本です』と表示。
+遷移：素材→S1。失敗：条件を具体表示しS0へ戻る。ファイルを勝手に変換しない。
+
+S1 読み込み/解析
+目的：音声と素材条件を確認。最重要：読み込む素材名、音声トラック、解析段階。主操作『キャンセル』。
+優先：ファイル情報→音声トラック→進捗→注意。複数音声は1本をユーザーが選ぶ。選択トラックだけを出力することを明示。
+PCは全幅の工程帯。狭幅は縦。完了S2。音声なしはE_NO_AUDIOと素材選び直し。
+
+S2 間を整える
+目的：自動候補から不要な間だけを詰める。最重要：映像・カット箇所・前後の声。主操作『つなぎ目を確認』。
+優先：映像→候補波形→選択候補の復元→基本3設定→書き出し。
+PCは映像8列/設定4列、波形全幅。下にカット候補リスト（仮想化）を開閉可。詳細右ペイン常設は不可。
+狭幅は映像→波形→選択候補→設定、技術検証用。初回スマホ非対応。
+設定は『自然に』『ゆったり』『短く』と詳細折りたたみ。言葉の意味をAI解析する印象を与えない。
+候補の1つを選ぶと、そのカット前後を短くエンコードして聞ける。元/編集後を切替。『この間を残す』で即復元。
+Ctrl+Z/Shift+Ctrl+Z、Space再生、左右矢印1フレーム、Deleteは候補の採用/保持切替（元ファイル削除ではない）。入力中はショートカットを奪わない。
+再解析時は手動保持の扱いを表示し、取り消し可能。保存・エクスポート直前の条件と解析revisionの一致を保証。
+遷移：書き出しS3、開くS0、設定S5。失敗：前の有効結果を残し、再解析/ログ保存。
+
+S3 書き出し
+目的：出力を確定。最重要：出力長/画質/保存先。主操作『この設定で保存』。
+優先：1080p30または720p30→元の縦横比維持→保存先→未確認候補数。
+PC中央720pxのdialog。狭幅は全画面。未確認があっても本人が『未確認を含めて保存』を選べる。全削除/出力0は禁止。
+進捗中はキャンセル、編集操作はread-only。完了S4。容量不足等はS3に戻す。
+
+S4 完了
+目的：成果物を使う。最重要：作成したファイル。主操作『動画を再生』、副操作『保存先を開く』。
+実測出力長/容量を表示。元動画削除、SNS投稿、送信を自動実行しない。もう一度編集でS2。
+
+S5 設定とプロジェクト
+保存場所、キャッシュ上限/削除、ライセンス状態、診断ログ、フォント/OSS表記。
+プロジェクトは動画を内包しない。移動した元動画は再リンクしSHA-256で一致確認。
+初回版にクラウド同期、PWA、iPhone、ログイン、動画広告を入れない。
+
+素材
+assets/logo_horizontal.svg/png、logo_mark.svg/png、pwa_icon_192.png、pwa_icon_512.png、apple_touch_icon.png。
+名称pwa_iconは共通納品規格のため。アプリのPWA対応を意味しない。desktop.icoも生成する。
+assets/icons/import,play,restore,cut,export,compareのsvg/png。
+assets/ui_desktop.pngは日本語が正確な静止UI見本。assets/brand_board.pngはブランド演出で、生成された細字は仕様の正本ではない。

@@ -1,0 +1,22 @@
+{
+  "product": "Maqiri",
+  "schemaVersion": 1,
+  "exampleOnly": true,
+  "algorithmVersion": "rms20-v1",
+  "fps": 30,
+  "settings": {
+    "thresholdDb": -35,
+    "minSilenceMs": 800,
+    "padBeforeMs": 150,
+    "padAfterMs": 150
+  },
+  "quietRunSeconds": [
+    10,
+    12
+  ],
+  "expectedCutFrames": {
+    "startFrame": 305,
+    "endFrame": 355
+  },
+  "expectedRemovedFrames": 50
+}

@@ -1,0 +1,38 @@
+Maqiri — 第三者ソフトウェアと書体の表示（THIRD_PARTY_NOTICES）
+更新: 2026-10-05
+
+本製品は以下のオープンソースソフトウェアと書体を同梱・使用しています。各ライセンス本文は配布物内の該当フォルダー、
+または各プロジェクトの公式配布物をご確認ください。本製品本体（Maqiri アプリケーションコード）のライセンスは EULA_DRAFT.txt に従います。
+
+1. FFmpeg（ffmpeg.exe / ffprobe.exe）
+   - 版: n8.1.3-14-g330caae0c1（release/8.1 ブランチ、コミット 330caae0c1acccd2222edc52a05940c574561ce5）
+   - ビルド: BtbN/FFmpeg-Builds autobuild-2026-10-05-13-07、win64-lgpl（静的リンク）
+   - ライセンス: GNU Lesser General Public License v3（--enable-version3）。--enable-gpl / --enable-nonfree なし。libx264 / libx265 は含みません
+   - H.264 エンコードは Windows Media Foundation（h264_mf、OS 同梱）を使用します
+   - ライセンス本文: resources/media-tools/win32-x64/LICENSE.txt（配布物では media-tools/win32-x64/LICENSE.txt、docs/FFMPEG_LICENSE_LGPLv3.txt）
+   - 対応ソース: media-tools/source/ffmpeg-330caae0c1.tar.gz（FFmpeg 本体）、media-tools/source/ffmpeg-builds-scripts-9acad4a9.tar.gz（ビルドスクリプト）
+   - 構成フラグとハッシュ: media-tools/media-tools.lock.json
+   - 注意: 静的リンクされた依存ライブラリ（libopus, libvpx, libaom, dav1d, libass, FreeType, HarfBuzz, fontconfig, libxml2, zlib, lzma, libwebp, OpenJPEG, libvorbis, libtheora, libmp3lame, opencore-amr, SRT, RIST, zimg, libplacebo, Vulkan ローダー, OpenAL, SDL2, ほか）はそれぞれ LGPL/BSD/MIT/ISC 等のライセンスです。
+     各ライブラリの版はビルドスクリプト（scripts.d/）が取得するものに従います。対応ソースの完全な集合（全依存ライブラリのソース）は配布前に
+     RELEASE_CHECKLIST.txt の手順で生成・同梱してください（現時点では FFmpeg 本体とビルドスクリプトのみ同梱）。
+   - 商標: FFmpeg は Fabrice Bellard の商標です。
+
+2. Electron（アプリケーションフレームワーク）: MIT License。Chromium（BSD-style）、Node.js（MIT）、V8（BSD）を含みます。
+   https://www.electronjs.org/ — ライセンス本文は配布物の LICENSE.electron.txt および LICENSES.chromium.html
+
+3. React / React DOM: MIT License — Copyright (c) Meta Platforms, Inc. and affiliates.
+4. Zustand: MIT License — Copyright (c) 2019 Paul Henschel.
+5. Zod: MIT License — Copyright (c) 2025 Colin McDonnell.
+（React / Zustand / Zod はレンダラー/メインのバンドルに含まれます。）
+
+6. 書体（すべて SIL Open Font License 1.1。原文は assets/fonts/*-OFL.txt に同梱）
+   - Noto Sans JP — Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. / Google Noto project
+   - Noto Serif JP — Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'. / Google Noto project
+   - Newsreader — Copyright 2020 The Newsreader Project Authors (https://github.com/productiontype/Newsreader)
+   - DM Mono — Copyright 2020 The DM Mono Project Authors (https://github.com/googlefonts/dm-mono)
+   配布元: https://github.com/google/fonts/tree/main/ofl/
+
+7. 開発時のみ使用（配布物に含まれない）: electron-vite, Vite, TypeScript, Vitest, Playwright, electron-builder, esbuild, @vitejs/plugin-react。
+   Linux/macOS での開発テストにはシステムの FFmpeg（GPL 構成の場合あり）と libx264 を「dev encoder」として使いますが、配布物には含めません。
+
+8. アイコン・ロゴ・ブランドボード: Maqiri 企画同梱素材（assets/）。
