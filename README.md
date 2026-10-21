@@ -8,6 +8,14 @@
 - 配布: `APP_EDITION=demo`（先頭 90 秒のみ、透かしなし）と `APP_EDITION=full`（30 分 / 4GiB まで）の 2 ビルド。制限は main プロセスで強制します。
 - 処理はすべてローカル。動画・音声・解析結果を外部へ送信しません。
 
+## 実装範囲と確認先
+
+- 対象はBGM追加前の単独話者の録画です。文字起こし・字幕・フィラーの意味理解による削除は行いません。
+- demo版は先頭90秒。Windows配布物の署名・実機確認、対応形式の確認はリリース前の別工程です。
+
+実装箇所：[src/domain](./src/domain) / [src/media](./src/media) / [src/main](./src/main) / [tests](./tests)。
+現在の残項目：[docs/HANDOFF.txt](./docs/HANDOFF.txt)。
+
 ## 構成
 
 | ディレクトリ | 内容 |
